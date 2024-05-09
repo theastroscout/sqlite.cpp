@@ -5,13 +5,15 @@
 
 ```cpp
 #include "sqlite.hpp"
+surfy::SQLiteDB db;
+
 #include "json.hpp" // https://github.com/nlohmann/json/blob/develop/single_include/nlohmann/json.hpp
 using json = nlohmann::ordered_json;
 
+surfy::SQLiteDB db;
+
 int main() {
-
-	surfy::SQLiteDB db("example.db");
-
+	db.connect("example.db");
 	return 0;
 }
 
@@ -73,12 +75,25 @@ result = db.findSync("SELECT * FROM users WHERE name=?;", params);
 	{
 		"id": 1,
 		"name": "John",
-		"username": "Doe"
+		"username": "Doe",
+		"assets": {}
 	},
 	{
 		"id": 2,
 		"name": "John",
-		"username": "Doe Jr."
+		"username": "Doe Jr.",
+		"assets": {}
+	},
+	{
+		"id": 2,
+		"name": "John",
+		"username": "Doe Sr.",
+		"assets": {
+			"car": "nope",
+			"house": "nope",
+			"stableJob": false,
+			"dept": true
+		}
 	}
 ]
 

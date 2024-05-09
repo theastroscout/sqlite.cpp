@@ -10,20 +10,28 @@ namespace surfy {
 
 	class SQLiteDB {
 		sqlite3* db;
+		// sqlite3_stmt* stmt;
 
 	public:
-		SQLiteDB(const char* dbName) {
-			int rc = sqlite3_open(dbName, &db);
-			if (rc) {
-				std::cerr << "Can't open database: " << sqlite3_errmsg(db) << std::endl;
-				sqlite3_close(db);
-			} else {
-				std::cout << "DB connected: " << dbName << std::endl;
-			}
+		SQLiteDB() {
+			
 		}
 
 		~SQLiteDB() {
 			sqlite3_close(db);
+		}
+
+		bool connect(const char* dbName) {
+			int rc = sqlite3_open(dbName, &db);
+			if (rc) {
+				std::cerr << "@surfy::SQLiteDB:: Can't open database: " << sqlite3_errmsg(db) << std::endl;
+				sqlite3_close(db);
+				return false;
+			} else {
+				std::cout << "@surfy::SQLiteDB:: Connected to " << dbName << std::endl;
+			}
+
+			return true;
 		}
 
 		/*
@@ -81,7 +89,7 @@ namespace surfy {
 			}
 
 			result = getData(stmt);
-			
+
 			sqlite3_finalize(stmt);
 			return result;
 		}
@@ -236,8 +244,6 @@ namespace surfy {
 			
 			json row;
 
-			const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-
 			int numColumns = sqlite3_column_count(stmt);
 			for (int i = 0; i < numColumns; ++i) {
 				const char* columnName = sqlite3_column_name(stmt, i);
@@ -251,7 +257,16 @@ namespace surfy {
 						row[columnName] = sqlite3_column_double(stmt, i);
 						break;
 					case SQLITE_TEXT:
-						row[columnName] = reinterpret_cast<const char*>(sqlite3_column_text(stmt, i));
+						{
+							const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, i));
+							json j = json::parse(text, nullptr, false);
+							if (j.is_discarded()) {
+								std::string str(text);
+								row[columnName] = str;
+							} else {
+							 	row[columnName] = j;
+							}
+						}
 						break;
 					case SQLITE_BLOB:
 						// BLOB data
