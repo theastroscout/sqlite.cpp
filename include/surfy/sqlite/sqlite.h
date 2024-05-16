@@ -9,10 +9,13 @@ For multithreading is better to run new instance for each thread
 
 #include <sqlite3.h>
 #include <iostream>
-#include "json.hpp"
+
+#ifndef SURFY_HPP
+#include "../json.h"
+using json = nlohmann::ordered_json;
+#endif
 
 namespace surfy {
-	using json = nlohmann::ordered_json;
 
 	class SQLite {
 		sqlite3* db;
@@ -150,7 +153,9 @@ namespace surfy {
 
 		*/
 
-		json find(const std::string querySrc, const std::vector<std::string>& params = {}) {			
+		// template<typename FindCallback>
+		using Callback = std::function<void(const json&)>;
+		json find(const std::string querySrc, const std::vector<std::string>& params = {}, Callback callback = nullptr) {			
 
 			const char* query = querySrc.c_str();
 			
@@ -198,7 +203,13 @@ namespace surfy {
 
 			// Go
 
-			result = json::array();
+			result = {
+				{ "status", true },
+				{ "query", query }
+			};
+
+			std::vector<json> rows;
+
 			rc = sqlite3_step(stmt);
 			
 			if (rc == SQLITE_DONE) {
@@ -210,87 +221,23 @@ namespace surfy {
 			while (rc == SQLITE_ROW) {
 
 				json row = getData(stmt);
-				result.push_back(row);
-
-				// Next Row
-				rc = sqlite3_step(stmt);
-			}
-
-			sqlite3_finalize(stmt);
-			return result;
-		}
-
-		/*
-
-		Find Sequence
-		Put each result to Callback
-
-		*/
-
-		using Callback = std::function<void(const json&)>;
-		json findSeq(const char* query, Callback callback = nullptr, const std::vector<std::string>& params = {}) {
-			
-			json result;
-
-			sqlite3_stmt* stmt;
-			int rc = sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
-			if (rc != SQLITE_OK) {
-				sqlite3_finalize(stmt);
-				result["status"] = false;
-				std::string errorMessage = sqlite3_errmsg(db);
-				result["msg"] = "Preparation failed: " + errorMessage;
-				return result;
-			}
-
-			// Apply Params
-			if (!params.empty()) {
-				for (int i = 0; i < params.size(); ++i) {
-					int column = i + 1;
-					const std::string val = params[i];
-					if (sqlite3_bind_text(stmt, column, val.c_str(), -1, SQLITE_STATIC) != SQLITE_OK) {
-						sqlite3_finalize(stmt);
-						result["status"] = false;
-						std::string errorMessage = sqlite3_errmsg(db);
-						result["msg"] = "Error binding text: " + errorMessage + "\n" + std::to_string(column) + ":" + val;
-						return result;
-					}
+				if (callback) {
+					callback(row);
+				} else {
+					rows.push_back(row);
 				}
-			}
-
-			// Go
-
-			rc = sqlite3_step(stmt);
-			
-			if (rc == SQLITE_DONE) {
-				// Empty result set
-				sqlite3_finalize(stmt);
-				result["status"] = false;
-				result["msg"] = "Query returned no results.";
-				return result;
-			}
-
-			if (rc != SQLITE_ROW) {
-				sqlite3_finalize(stmt);
-				result["status"] = false;
-				result["msg"] = "Something's wrong. It shouldn't be like that.";
-				return result;
-			}
-
-			while (rc == SQLITE_ROW) {
-
-				json row = getData(stmt);
-				callback(row);
 
 				// Next Row
 				rc = sqlite3_step(stmt);
 			}
 
-			result["status"] = true;
+			if (!callback) {
+				result["rows"] = rows;
+			}
 
 			sqlite3_finalize(stmt);
 			return result;
 		}
-
 
 		/*
 
