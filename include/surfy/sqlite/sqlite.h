@@ -30,8 +30,9 @@ namespace surfy {
 			sqlite3_close(db);
 		}
 
-		bool connect(const char* dbName, bool extensions = false) {
-			int rc = sqlite3_open(dbName, &db);
+		bool connect(const std::string& dbName, bool extensions = false) {
+
+			int rc = sqlite3_open(dbName.c_str(), &db);
 			if (rc) {
 				std::cerr << "@surfy::SQLite:: Can't open database: " << sqlite3_errmsg(db) << std::endl;
 				sqlite3_close(db);
@@ -86,17 +87,17 @@ namespace surfy {
 
 		*/
 
-		json findOne(const char* query, const std::vector<std::string>& params = {}) {
+		json findOne(const std::string& query, const std::vector<std::string>& params = {}) {
 			
 			json result;
 
 			sqlite3_stmt* stmt;
-			int rc = sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
+			int rc = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, nullptr);
 			if (rc != SQLITE_OK) {
 				sqlite3_finalize(stmt);
-				result["status"] = false;
+				result["_status"] = false;
 				std::string errorMessage = sqlite3_errmsg(db);
-				result["msg"] = "Preparation failed: " + errorMessage;
+				result["_msg"] = "Preparation failed: " + errorMessage;
 				return result;
 			}
 
@@ -109,21 +110,27 @@ namespace surfy {
 					rc = sqlite3_bind_text(stmt, column, val.c_str(), -1, SQLITE_TRANSIENT);
 
 					if (rc != SQLITE_OK) {
+						
 						sqlite3_finalize(stmt);
-						result["status"] = false;
+						result["_status"] = false;
 						std::string errorMessage = sqlite3_errmsg(db);
-						result["msg"] = "Error binding text: " + errorMessage + '\n' + std::to_string(column) + ":" + val;
+						result["_msg"] = "Error binding text: " + errorMessage + '\n' + std::to_string(column) + ":" + val;
+						
 						return result;
 					}
 
 					
 					rc = sqlite3_step(stmt);
 					if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
-			            std::cerr << "Failed to execute statement: " << sqlite3_errmsg(db) << std::endl;
-			            sqlite3_finalize(stmt);
-			            sqlite3_close(db);
-			            return false;
+			            
+			            sqlite3_finalize(stmt);			            
+			            result["_status"] = false;
+			            std::string errorMessage = sqlite3_errmsg(db);
+						result["_msg"] = "Failed to execute statement: " + errorMessage;
+
+			           	return result;
 			        }
+
 					sqlite3_reset(stmt);
 				}
 			}
@@ -135,12 +142,13 @@ namespace surfy {
 			if (rc == SQLITE_DONE) {
 				// Empty result set
 				sqlite3_finalize(stmt);
-				result["status"] = false;
-				result["msg"] = "Query returned no results.";
+				result["_status"] = false;
+				result["_msg"] = "Query returned no results.";
 				return result;
 			}
 
 			result = getData(stmt);
+			result["_status"] = true;
 
 			sqlite3_finalize(stmt);
 			return result;
@@ -165,10 +173,10 @@ namespace surfy {
 			int rc = sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
 			if (rc != SQLITE_OK) {
 				sqlite3_finalize(stmt);
-				result["status"] = false;
+				result["_status"] = false;
 				std::string errorMessage = sqlite3_errmsg(db);
-				result["msg"] = "Preparation failed: " + errorMessage;
-				result["query"] = query;
+				result["_msg"] = "Preparation failed: " + errorMessage;
+				result["_query"] = query;
 
 				return result;
 			}
@@ -183,9 +191,9 @@ namespace surfy {
 
 					if (rc != SQLITE_OK) {
 						sqlite3_finalize(stmt);
-						result["status"] = false;
+						result["_status"] = false;
 						std::string errorMessage = sqlite3_errmsg(db);
-						result["msg"] = "Error binding text: " + errorMessage + '\n' + std::to_string(column) + ":" + val;
+						result["_msg"] = "Error binding text: " + errorMessage + '\n' + std::to_string(column) + ":" + val;
 						return result;
 					}
 
@@ -204,8 +212,8 @@ namespace surfy {
 			// Go
 
 			result = {
-				{ "status", true },
-				{ "query", query }
+				{ "_status", true },
+				{ "_query", query }
 			};
 
 			std::vector<json> rows;
@@ -222,6 +230,7 @@ namespace surfy {
 
 				json row = getData(stmt);
 				if (callback) {
+					row["_status"] = true;
 					callback(row);
 				} else {
 					rows.push_back(row);
