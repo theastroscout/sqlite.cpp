@@ -4,7 +4,7 @@
 ### Installation
 
 ```cpp
-#include "include/surfy/sqlite/sqlite.h"
+#include "include/surfy/sqlite/sqlite.hpp"
 surfy::SQLiteDB db;
 
 #include "include/json.hpp" // https://github.com/nlohmann/json/blob/develop/single_include/nlohmann/json.hpp

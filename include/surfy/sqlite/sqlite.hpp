@@ -11,7 +11,7 @@ For multithreading is better to run new instance for each thread
 #include <iostream>
 
 #ifndef SURFY_HPP
-#include "../json.h"
+#include "../json.hpp"
 using json = nlohmann::ordered_json;
 #endif
 
